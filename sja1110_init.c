@@ -36,6 +36,8 @@
 #include <linux/spi/spi.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/of_gpio.h>
+#include <linux/delay.h>
 
 #include "sja1110_init.h"
 
@@ -120,6 +122,39 @@ static u32 sja1110_write_reg(struct sja1110_priv *sja1110, u32 reg_addr, u32 val
 	return ret;
 }
 
+/* Retrieve GPIO number from the device tree and request it */
+static int get_and_request_gpio(struct sja1110_priv *sja1110)
+{
+	struct device_node *node;
+	int gpio_num = -1, ret = -ENODEV;
+
+	node = sja1110->spi->dev.of_node;
+	if (!node)
+		goto out;
+
+	of_property_read_u32(node, "reset-gpio", &gpio_num);
+	if (!gpio_is_valid(gpio_num))
+		goto out;
+
+	if (gpio_request(gpio_num, "SJA1110 soft reset") != 0) {
+		dev_err(&sja1110->spi->dev,
+			"GPIO request failed (already requested?)\n");
+		goto out;
+	}
+
+	if (gpio_direction_output(gpio_num, 1) != 0) {
+		dev_err(&sja1110->spi->dev,
+			"GPIO direction could not be set\n");
+		gpio_free(gpio_num);
+		goto out;
+	}
+
+	ret = gpio_num;
+
+out:
+	return ret;
+}
+
 
 /*******************************************************************************
  * Switch specific handlers
@@ -171,10 +206,29 @@ out:
 }
 
 /**
- * Do a cold reset of the switch
+ * Do a soft reset of the switch using a reset pin
  * sja1110->devtype needs to be SJA1110_SWITCH
  */
-static int sja1110_reset(struct sja1110_priv *sja1110)
+static int sja1110_reset_gpio(struct sja1110_priv *sja1110)
+{
+	int us = RESET_DELAY_US;
+
+	BUG_ON(sja1110->devtype != SJA1110_SWITCH);
+	if (sja1110->gpio_num < 0)
+		return sja1110->gpio_num;
+
+	gpio_set_value_cansleep(sja1110->gpio_num, 0);
+	usleep_range(us, us + DIV_ROUND_UP(us, 10));
+	gpio_set_value_cansleep(sja1110->gpio_num, 1);
+
+	return 0;
+}
+
+/**
+ * Do a cold reset of the switch using SPI
+ * sja1110->devtype needs to be SJA1110_SWITCH
+ */
+static int sja1110_reset_spi(struct sja1110_priv *sja1110)
 {
 	int count = 0, ret = -EIO;
 
@@ -189,6 +243,23 @@ static int sja1110_reset(struct sja1110_priv *sja1110)
 			break;
 		}
 	}
+
+	return ret;
+}
+
+/**
+ * Do a reset of the switch, either via a reset pin or via SPI
+ * sja1110->devtype needs to be SJA1110_SWITCH
+ */
+static int sja1110_reset(struct sja1110_priv *sja1110)
+{
+	int ret;
+
+	BUG_ON(sja1110->devtype != SJA1110_SWITCH);
+	if (sja1110->gpio_num > 0)
+		ret = sja1110_reset_gpio(sja1110);
+	else
+		ret = sja1110_reset_spi(sja1110);
 
 	return ret;
 }
@@ -680,6 +751,52 @@ static DEVICE_ATTR(switch_cfg_upload, S_IWUSR | S_IRUSR,
 static DEVICE_ATTR(uc_fw_upload, S_IWUSR | S_IRUSR,
 		   sysfs_get_cfg_upload, sysfs_set_cfg_upload);
 
+static ssize_t sysfs_get_reset(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	/* write result into the buffer */
+	return scnprintf(buf, PAGE_SIZE,
+		"[%s] Write to this file to reset the SJA1110\n", __func__);
+}
+
+static ssize_t sysfs_set_reset(struct device *dev,
+			       struct device_attribute *attr,
+			       const char *buf, size_t count)
+{
+	struct spi_device *spi = container_of(dev, struct spi_device, dev);
+	struct sja1110_priv *sja1110 = spi_get_drvdata(spi);
+
+	sja1110_reset(sja1110);
+
+	return count;
+}
+
+static DEVICE_ATTR(switch_reset, S_IWUSR | S_IRUSR,
+		   sysfs_get_reset, sysfs_set_reset);
+
+/* uc attribute group */
+static struct attribute *uc_sysfs_attrs[] = {
+	&dev_attr_uc_fw_upload.attr,
+	NULL
+};
+
+static struct attribute_group uc_attribute_group = {
+	.name = "uc-configuration",
+	.attrs = uc_sysfs_attrs,
+};
+
+/* switch attribute group */
+static struct attribute *switch_sysfs_attrs[] = {
+	&dev_attr_switch_cfg_upload.attr,
+	&dev_attr_switch_reset.attr,
+	NULL
+};
+
+static struct attribute_group switch_attribute_group = {
+	.name = "switch-configuration",
+	.attrs = switch_sysfs_attrs,
+};
+
 
 /*******************************************************************************
  * SPI Driver
@@ -727,13 +844,16 @@ static int sja1110_probe(struct spi_device *spi)
 		sja1110->upload       = sja1110_uc_upload;
 		sja1110->post_upload  = sja1110_post_uc_upload;
 
+		/* GPIO is only configured for the switch */
+		sja1110->gpio_num = -ENODEV;
+
 		/* indicate that µC data structures are initialized */
 		g_state.sja1110[sja1110->devtype] = sja1110;
 		complete(&g_state.uc_initialized);
 
 		/* create sysfs file and attach attributes */
-		ret = sysfs_create_file(&spi->dev.kobj,
-					&dev_attr_uc_fw_upload.attr);
+		ret = sysfs_create_group(&spi->dev.kobj,
+					 &uc_attribute_group);
 		if (ret)
 			goto out;
 	} else {
@@ -749,6 +869,9 @@ static int sja1110_probe(struct spi_device *spi)
 		sja1110->upload       = sja1110_switch_upload;
 		sja1110->post_upload  = sja1110_post_switch_upload;
 
+		/* try to get a GPIO pin from the device tree */
+		sja1110->gpio_num = get_and_request_gpio(sja1110);
+
 		/**
 		 * Try to upload binaries with default names after probing.
 		 * Upload switch config FIRST, µC firmware SECOND.
@@ -760,8 +883,8 @@ static int sja1110_probe(struct spi_device *spi)
 		schedule_work(&g_state.post_probe_work);
 
 		/* create sysfs file and attach attributes */
-		ret = sysfs_create_file(&spi->dev.kobj,
-					&dev_attr_switch_cfg_upload.attr);
+		ret = sysfs_create_group(&spi->dev.kobj,
+					 &switch_attribute_group);
 		if (ret)
 			goto out;
 	}
@@ -779,11 +902,14 @@ static int sja1110_remove(struct spi_device *spi)
 
 	sja1110 = spi_get_drvdata(spi);
 	if (sja1110->devtype == SJA1110_UC) {
-		sysfs_remove_file(&spi->dev.kobj,
-				  &dev_attr_uc_fw_upload.attr);
+		sysfs_remove_group(&spi->dev.kobj,
+				   &uc_attribute_group);
 	} else {
-		sysfs_remove_file(&spi->dev.kobj,
-				  &dev_attr_switch_cfg_upload.attr);
+		sysfs_remove_group(&spi->dev.kobj,
+				   &switch_attribute_group);
+
+		if (sja1110->gpio_num > 0)
+			gpio_free(sja1110->gpio_num);
 	}
 
 	return 0;

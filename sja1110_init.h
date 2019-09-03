@@ -86,6 +86,7 @@ enum uc_err_code {
 #define CONFIGURATIONFLAG_ADDR (0x1UL)      /**< Address of the configurationFlags register */
 #define R_CTRL_ADDR            (0x1C6000UL) /**< Address of the resetCtrl register */
 #define RESET_CTRL_COLDRESET   BIT(5)
+#define RESET_DELAY_US         50
 #define CGU_OUTCLK_C_WATCHDOG  (0xFF719074UL)
 
 #define SJA1110_VAL_DEVICEID (0xb700030eUL)
@@ -99,6 +100,7 @@ struct sja1110_priv {
 	struct spi_device *spi;      /**< Passsed at SPI probing */
 	char bin_name[PATH_LEN];     /**< Name of the binary (fw or config) */
 	char *def_bin_name;          /**< Default name of the binary */
+	int gpio_num;                /**< GPIO used to reset the device */
 	struct mutex lock;           /**< Protect private data structure */
 	enum spi_devtype devtype;    /**< Type of the SPI device */
 	int (*pre_upload) (struct sja1110_priv*, const u8*, int);
