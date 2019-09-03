@@ -20,16 +20,17 @@
 		pinctrl-0 = <0xa 0xb>;
 		pinctrl-assert-gpios = <0xc 0x4 0x1>;
 
-		/* the uC controlling the switch */
+		/* the switch */
 		sja1110@0 {
-			compatible = "nxp,sja1110-uc";
-			spi-max-frequency = <12000000>;
+			compatible = "nxp,sja1110-switch";
+			spi-max-frequency = <8000000>;
+			reset-gpio = <195>;
 			reg = <0x0>; /* CS */
 		};
 
-		/* the switch */
+		/* the µC controlling the switch */
 		sja1110@1 {
-			compatible = "nxp,sja1110-switch";
+			compatible = "nxp,sja1110-uc";
 			spi-max-frequency = <12000000>;
 			reg = <0x1>; /* CS */
 		};
