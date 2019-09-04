@@ -850,6 +850,138 @@ static struct attribute_group switch_attribute_group = {
 
 
 /*******************************************************************************
+ * GPIO Driver
+ ******************************************************************************/
+static int sja1110_gpio_dir_in(struct gpio_chip *chip, unsigned gpio)
+{
+	struct sja1110_priv *sja1110 = gpiochip_get_data(chip);
+
+	mutex_lock(&sja1110->lock);
+	/* disable output for gpio */
+	sja1110_write_bit(sja1110, GPIO_PCOE_ADDR, gpio, 0);
+
+	/* enable input for gpio */
+	sja1110_write_bit(sja1110, GPIO_PCIE_ADDR, gpio, 1);
+	mutex_unlock(&sja1110->lock);
+
+	return 0;
+}
+
+static int sja1110_gpio_dir_out(struct gpio_chip *chip, unsigned gpio, int val)
+{
+	struct sja1110_priv *sja1110 = gpiochip_get_data(chip);
+
+	mutex_lock(&sja1110->lock);
+	/* disable input for gpio */
+	sja1110_write_bit(sja1110, GPIO_PCIE_ADDR, gpio, 0);
+
+	/* enable output for gpio */
+	sja1110_write_bit(sja1110, GPIO_PCOE_ADDR, gpio, 1);
+	mutex_unlock(&sja1110->lock);
+
+	return 0;
+}
+
+static int sja1110_gpio_get(struct gpio_chip *chip, unsigned gpio)
+{
+	struct sja1110_priv *sja1110 = gpiochip_get_data(chip);
+	u32 reg_val;
+
+	mutex_lock(&sja1110->lock);
+	reg_val = sja1110_read_reg(sja1110, GPIO_PDI_ADDR);
+	mutex_unlock(&sja1110->lock);
+
+	return reg_val & BIT(gpio);
+}
+
+static void sja1110_gpio_set(struct gpio_chip *chip, unsigned gpio, int val)
+{
+	struct sja1110_priv *sja1110 = gpiochip_get_data(chip);
+	u32 reg_addr;
+
+	if (val == 0)
+		/* need to clear the gpio bit in PDO register */
+		reg_addr = GPIO_PDOCLR_ADDR;
+	else
+		/* need to set the gpio bit in PDO register */
+		reg_addr = GPIO_PDOSET_ADDR;
+
+	mutex_lock(&sja1110->lock);
+	sja1110_write_reg(sja1110, reg_addr, BIT(gpio));
+	mutex_unlock(&sja1110->lock);
+
+	return;
+}
+
+static void sja1110_gpio_set_multiple(struct gpio_chip *chip,
+				      unsigned long *mask, unsigned long *bits)
+{
+	struct sja1110_priv *sja1110 = gpiochip_get_data(chip);
+	u32 reg_val;
+
+	mutex_lock(&sja1110->lock);
+	reg_val = sja1110_read_reg(sja1110, GPIO_PDO_ADDR);
+	reg_val &= ~mask[0];
+	reg_val |= (mask[0] & bits[0]);
+	sja1110_write_reg(sja1110, GPIO_PDO_ADDR, reg_val);
+	mutex_unlock(&sja1110->lock);
+}
+
+int sja1110_set_config(struct gpio_chip *chip, unsigned gpio,
+		       unsigned long config)
+{
+	enum pin_config_param param = pinconf_to_config_param(config);
+	struct sja1110_priv *sja1110 = gpiochip_get_data(chip);
+	int value = -1;
+
+	switch (param) {
+	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
+		value = 0;
+		break;
+	case PIN_CONFIG_DRIVE_OPEN_SOURCE:
+		value = 1;
+		break;
+	default:
+		break;
+	}
+
+	if (value >= 0) {
+		mutex_lock(&sja1110->lock);
+		sja1110_write_bit(sja1110, GPIO_PCOM_ADDR, gpio, value);
+		mutex_unlock(&sja1110->lock);
+	}
+
+	return 0;
+}
+
+static const struct gpio_chip sja1110_gpio_chip = {
+	.label			= "SJA1110-gpiochip",
+	.owner			= THIS_MODULE,
+	.base			= -1, /* dynamic gpio number allocation */
+	.direction_input	= sja1110_gpio_dir_in,
+	.direction_output	= sja1110_gpio_dir_out,
+	.get			= sja1110_gpio_get,
+	.set			= sja1110_gpio_set,
+	.set_multiple		= sja1110_gpio_set_multiple,
+	.set_config		= sja1110_set_config,
+	.can_sleep		= true,
+};
+
+static int sja1110_gpio_setup(struct sja1110_priv *sja1110)
+{
+	struct sja1110_switch_priv *switch_priv = sja1110->switch_priv;
+
+	switch_priv->gpio_chip		= sja1110_gpio_chip;
+	switch_priv->gpio_chip.ngpio	= SJA1110_NUM_GPIOS;
+	switch_priv->gpio_chip.parent	= &sja1110->spi->dev;
+
+	return devm_gpiochip_add_data(switch_priv->gpio_chip.parent,
+				      &switch_priv->gpio_chip,
+				      sja1110);
+}
+
+
+/*******************************************************************************
  * SPI Driver
  ******************************************************************************/
 static int sja1110_probe(struct spi_device *spi)
@@ -925,6 +1057,14 @@ static int sja1110_probe(struct spi_device *spi)
 			dev_err(&spi->dev,
 				"Memory allocation for sja1110_switch failed\n");
 			ret = -ENOMEM;
+			goto out;
+		}
+
+		/* GPIO driver init */
+		ret = sja1110_gpio_setup(sja1110);
+		if (ret) {
+			dev_err(&spi->dev,
+				"Could not register gpiochip (ret=%d)\n", ret);
 			goto out;
 		}
 
