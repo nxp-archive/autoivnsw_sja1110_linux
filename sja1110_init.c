@@ -709,7 +709,7 @@ static int sja1110_probe(struct spi_device *spi)
 
 	/* init common private data structure */
 	sja1110->spi     = spi;
-	sja1110->devtype = (int)match->data;
+	sja1110->devtype = (long)match->data;
 	mutex_init(&sja1110->lock);
 	INIT_WORK(&sja1110->work, sja1110_init_hw_worker);
 
