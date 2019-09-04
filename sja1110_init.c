@@ -125,6 +125,31 @@ static u32 sja1110_write_reg(struct sja1110_priv *sja1110, u32 reg_addr, u32 val
 	return ret;
 }
 
+/**
+ * Set or clear a given bit in a given register of the switch
+ * sja1110->devtype needs to be SJA1110_SWITCH
+ */
+static u32 sja1110_write_bit(struct sja1110_priv *sja1110, u32 reg_addr,
+			     u32 bit_num, u32 val)
+{
+	u32 reg_val;
+	int ret;
+
+	if (val == 0) {
+		/* clear bit */
+		reg_val = sja1110_read_reg(sja1110, reg_addr);
+		reg_val &= ~BIT(bit_num);
+		ret = sja1110_write_reg(sja1110, reg_addr, reg_val);
+	} else {
+		/* set bit */
+		reg_val = sja1110_read_reg(sja1110, reg_addr);
+		reg_val |= BIT(bit_num);
+		ret = sja1110_write_reg(sja1110, reg_addr, reg_val);
+	}
+
+	return ret;
+}
+
 /* Retrieve GPIO number from the device tree and request it */
 static int get_and_request_gpio(struct sja1110_priv *sja1110)
 {
