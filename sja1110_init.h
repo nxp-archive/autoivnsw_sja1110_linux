@@ -97,17 +97,22 @@ enum uc_err_code {
  * Data Types
  ******************************************************************************/
 enum spi_devtype {SJA1110_SWITCH, SJA1110_UC};
+
+struct sja1110_switch_priv {
+	int rst_gpio;                /**< number of GPIO used to reset the device */
+};
+
 struct sja1110_priv {
 	struct spi_device *spi;      /**< Passsed at SPI probing */
 	char bin_name[PATH_LEN];     /**< Name of the binary (fw or config) */
 	char *def_bin_name;          /**< Default name of the binary */
-	int gpio_num;                /**< GPIO used to reset the device */
 	struct mutex lock;           /**< Protect private data structure */
 	enum spi_devtype devtype;    /**< Type of the SPI device */
 	int (*pre_upload) (struct sja1110_priv*, const u8*, int);
 	int (*upload)     (struct sja1110_priv*, const u8*, int);
 	int (*post_upload)(struct sja1110_priv*, const u8*, int);
 	struct work_struct work;
+	struct sja1110_switch_priv *switch_priv; /**< Additional data only required for the switch SPI endpoint */ 
 };
 
 struct sja1110_uc_status_pkt {

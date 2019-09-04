@@ -129,30 +129,30 @@ static u32 sja1110_write_reg(struct sja1110_priv *sja1110, u32 reg_addr, u32 val
 static int get_and_request_gpio(struct sja1110_priv *sja1110)
 {
 	struct device_node *node;
-	int gpio_num = -1, ret = -ENODEV;
+	int rst_gpio = -1, ret = -ENODEV;
 
 	node = sja1110->spi->dev.of_node;
 	if (!node)
 		goto out;
 
-	of_property_read_u32(node, "reset-gpio", &gpio_num);
-	if (!gpio_is_valid(gpio_num))
+	of_property_read_u32(node, "reset-gpio", &rst_gpio);
+	if (!gpio_is_valid(rst_gpio))
 		goto out;
 
-	if (gpio_request(gpio_num, "SJA1110 soft reset") != 0) {
+	if (gpio_request(rst_gpio, "SJA1110 soft reset") != 0) {
 		dev_err(&sja1110->spi->dev,
 			"GPIO request failed (already requested?)\n");
 		goto out;
 	}
 
-	if (gpio_direction_output(gpio_num, 1) != 0) {
+	if (gpio_direction_output(rst_gpio, 1) != 0) {
 		dev_err(&sja1110->spi->dev,
 			"GPIO direction could not be set\n");
-		gpio_free(gpio_num);
+		gpio_free(rst_gpio);
 		goto out;
 	}
 
-	ret = gpio_num;
+	ret = rst_gpio;
 
 out:
 	return ret;
@@ -231,14 +231,16 @@ out:
 static int sja1110_reset_gpio(struct sja1110_priv *sja1110)
 {
 	int us = RESET_DELAY_US;
+	int rst_gpio;
 
 	BUG_ON(sja1110->devtype != SJA1110_SWITCH);
-	if (sja1110->gpio_num < 0)
-		return sja1110->gpio_num;
+	rst_gpio = sja1110->switch_priv->rst_gpio;
+	if (rst_gpio < 0)
+		return rst_gpio;
 
-	gpio_set_value_cansleep(sja1110->gpio_num, 0);
+	gpio_set_value_cansleep(rst_gpio, 0);
 	usleep_range(us, us + DIV_ROUND_UP(us, 10));
-	gpio_set_value_cansleep(sja1110->gpio_num, 1);
+	gpio_set_value_cansleep(rst_gpio, 1);
 
 	return 0;
 }
@@ -263,7 +265,7 @@ static int sja1110_reset(struct sja1110_priv *sja1110)
 	int ret, count = 0;
 
 	BUG_ON(sja1110->devtype != SJA1110_SWITCH);
-	if (sja1110->gpio_num > 0)
+	if (sja1110->switch_priv->rst_gpio > 0)
 		ret = sja1110_reset_gpio(sja1110);
 	else
 		ret = sja1110_reset_spi(sja1110);
@@ -868,9 +870,7 @@ static int sja1110_probe(struct spi_device *spi)
 		sja1110->pre_upload   = sja1110_pre_uc_upload;
 		sja1110->upload       = sja1110_uc_upload;
 		sja1110->post_upload  = sja1110_post_uc_upload;
-
-		/* GPIO is only configured for the switch */
-		sja1110->gpio_num = -ENODEV;
+		sja1110->switch_priv  = NULL;
 
 		/* indicate that µC data structures are initialized */
 		g_state.sja1110[sja1110->devtype] = sja1110;
@@ -894,8 +894,17 @@ static int sja1110_probe(struct spi_device *spi)
 		sja1110->upload       = sja1110_switch_upload;
 		sja1110->post_upload  = sja1110_post_switch_upload;
 
+		sja1110->switch_priv = devm_kzalloc(&spi->dev,
+			sizeof(struct sja1110_switch_priv), GFP_KERNEL);
+		if (!sja1110->switch_priv) {
+			dev_err(&spi->dev,
+				"Memory allocation for sja1110_switch failed\n");
+			ret = -ENOMEM;
+			goto out;
+		}
+
 		/* try to get a GPIO pin from the device tree */
-		sja1110->gpio_num = get_and_request_gpio(sja1110);
+		sja1110->switch_priv->rst_gpio = get_and_request_gpio(sja1110);
 
 		/**
 		 * Try to upload binaries with default names after probing.
@@ -933,8 +942,8 @@ static int sja1110_remove(struct spi_device *spi)
 		sysfs_remove_group(&spi->dev.kobj,
 				   &switch_attribute_group);
 
-		if (sja1110->gpio_num > 0)
-			gpio_free(sja1110->gpio_num);
+		if (sja1110->switch_priv->rst_gpio > 0)
+			gpio_free(sja1110->switch_priv->rst_gpio);
 	}
 
 	return 0;
