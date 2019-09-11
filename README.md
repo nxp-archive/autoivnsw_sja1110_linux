@@ -22,9 +22,10 @@ This Document describes a driver for the NXP **SJA1110** Ethernet Switch. Logica
 
 ## SJA1110 Loading
 - The kernel module can for example be loaded by executing `insmod sja1110.ko`
-- There are two available module parameters that can be set during module loading:
+- There are multiple module parameters that can be set during module loading:
 	- `firmware_name`: Default filename of the firmware binary for the uC (default value: `sja1110_uc.bin`)
 	- `config_name`: Default filename of the static configuration binary for the switch (default value: `sja1110_switch.bin`)
+	- `max_spi_speed`: Clock Frequency that is used for SPI transfers (default value: `10 MHz`)
 
 ### Auto Upload
 The driver will try to upload both the firmware and the static configuration with the above default names during device probing.

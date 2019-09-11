@@ -64,6 +64,9 @@ module_param(config_name, charp, S_IRUGO);
 MODULE_PARM_DESC(config_name,
 	"Name of the SJA1110 switch configuration to be loaded");
 
+static int max_spi_speed = 10000000;
+module_param(max_spi_speed, int, S_IRUGO);
+MODULE_PARM_DESC(max_spi_speed, "Max SPI frequency in Hz");
 
 /*******************************************************************************
  * Helper Functions
@@ -825,8 +828,9 @@ static int sja1110_probe(struct spi_device *spi)
 	}
 
 	/* init common private data structure */
-	sja1110->spi     = spi;
-	sja1110->devtype = (long)match->data;
+	spi->max_speed_hz = max_spi_speed;
+	sja1110->spi      = spi;
+	sja1110->devtype  = (long)match->data;
 	mutex_init(&sja1110->lock);
 	INIT_WORK(&sja1110->work, sja1110_init_hw_worker);
 
