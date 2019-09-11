@@ -284,6 +284,7 @@ static int sja1110_switch_upload(struct sja1110_priv *sja1110,
 	/* power down watchdog clock */
 	sja1110_write_reg(sja1110, CGU_OUTCLK_C_WATCHDOG, 0x5000001);
 
+	dev_info(&sja1110->spi->dev, "Uploading config...\n");
 	for (i = cfg_size; i > 0; i -= block_len) {
 		u32 cmd[2];
 		const u8 *buf_ptr = &cfg_data[page * block_len];
@@ -294,7 +295,7 @@ static int sja1110_switch_upload(struct sja1110_priv *sja1110,
 
 		ret = sja1110_simple_upload(sja1110, (u8*)cmd, tx_len, tx_len);
 		if (ret) {
-			dev_err(&sja1110->spi->dev, "Could not send fw!\n");
+			dev_err(&sja1110->spi->dev, "Could not send config!\n");
 			goto out;
 		}
 		page++;
@@ -406,8 +407,9 @@ static int sja1110_uc_parse_status_many(struct sja1110_priv *sja1110,
 		if (uc_status.status != DOWNLOADING ||
 		    uc_status.err_code != NO_ERROR) {
 			dev_err(&sja1110->spi->dev,
-				"[%s] Upload error (status=%d,err=%d)\n",
-				__func__, uc_status.status, uc_status.err_code);
+				"[%s] Upload error detected in status message %d (status=0x%x,err=0x%x)\n",
+				__func__, pos / 4,
+				uc_status.status,uc_status.err_code);
 			ret = uc_status.err_code;
 			goto out;
 		}
@@ -535,6 +537,7 @@ static int sja1110_uc_upload(struct sja1110_priv *sja1110,
 	}
 
 	/* send the firmware */
+	dev_info(&sja1110->spi->dev, "Uploading firmware...\n");
 	ret = sja1110_spi_transfer(sja1110, fw_data, rx_buf, fw_size, fw_size);
 	if (ret) {
 		dev_err(&sja1110->spi->dev, "Could not send fw!\n");
