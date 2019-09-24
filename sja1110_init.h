@@ -87,7 +87,8 @@ enum uc_err_code {
 #define R_CTRL_ADDR            (0x1C6000UL) /**< Address of the resetCtrl register */
 #define RESET_CTRL_COLDRESET   BIT(5)
 #define RESET_DELAY_US         50
-#define CGU_OUTCLK_C_WATCHDOG  (0xFF719074UL)
+#define CGU_SPI_BASE_ADDR      (0x1C6400UL)
+#define CGU_OUTCLK_C_WATCHDOG  (CGU_SPI_BASE_ADDR + 0x1DUL)
 
 #define SJA1110_VAL_DEVICEID (0xb700030eUL)
 
