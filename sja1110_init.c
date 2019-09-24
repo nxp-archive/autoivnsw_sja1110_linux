@@ -158,6 +158,26 @@ out:
 	return ret;
 }
 
+/**
+ * Check if a given value is a valid device id.
+ *
+ * Returns index into device_id_list[] array if valid,
+ * returns -1 if value is not a valid device id
+ */
+static int sja1110_check_device_id(u32 reg_val)
+{
+	int dev_id_idx;
+
+	for (dev_id_idx = 0; dev_id_idx < NUM_DEVICE_IDS; dev_id_idx++)
+		if (reg_val == device_id_list[dev_id_idx])
+			break;
+
+	if (dev_id_idx >= NUM_DEVICE_IDS)
+		return -1;
+
+	return dev_id_idx;
+}
+
 
 /*******************************************************************************
  * Switch specific handlers
@@ -170,11 +190,7 @@ static int sja1110_pre_switch_upload(struct sja1110_priv *sja1110,
 
 	/* read the device id */
 	registerValue = sja1110_read_reg(sja1110, D_ID_ADDR);
-	for (dev_id_idx=0; dev_id_idx<NUM_DEVICE_IDS; dev_id_idx++)
-		if (registerValue == device_id_list[dev_id_idx])
-			break;
-
-	if (dev_id_idx >= NUM_DEVICE_IDS) {
+	if (sja1110_check_device_id(registerValue) < 0) {
 		dev_err(&sja1110->spi->dev,
 			"Device id 0x%x is not supported!\n", registerValue);
 		goto out;
