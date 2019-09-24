@@ -249,21 +249,9 @@ static int sja1110_reset_gpio(struct sja1110_priv *sja1110)
  */
 static int sja1110_reset_spi(struct sja1110_priv *sja1110)
 {
-	int count = 0, ret = -EIO;
-
 	BUG_ON(sja1110->devtype != SJA1110_SWITCH);
 
-	sja1110_write_reg(sja1110, R_CTRL_ADDR, RESET_CTRL_COLDRESET);
-
-	while (count++ < 30) {
-		u32 registerValue = sja1110_read_reg(sja1110, D_ID_ADDR);
-		if (registerValue == SJA1110_VAL_DEVICEID) {
-			ret = 0;
-			break;
-		}
-	}
-
-	return ret;
+	return sja1110_write_reg(sja1110, R_CTRL_ADDR, RESET_CTRL_COLDRESET);
 }
 
 /**
@@ -272,7 +260,7 @@ static int sja1110_reset_spi(struct sja1110_priv *sja1110)
  */
 static int sja1110_reset(struct sja1110_priv *sja1110)
 {
-	int ret;
+	int ret, count = 0;
 
 	BUG_ON(sja1110->devtype != SJA1110_SWITCH);
 	if (sja1110->gpio_num > 0)
@@ -280,6 +268,20 @@ static int sja1110_reset(struct sja1110_priv *sja1110)
 	else
 		ret = sja1110_reset_spi(sja1110);
 
+	if (ret)
+		goto out;
+
+	/* wait until device is up again */
+	ret = -ETIMEDOUT;
+	while (count++ < 30) {
+		u32 registerValue = sja1110_read_reg(sja1110, D_ID_ADDR);
+		if (sja1110_check_device_id(registerValue) >= 0) {
+			ret = 0;
+			break;
+		}
+	}
+
+out:
 	return ret;
 }
 
