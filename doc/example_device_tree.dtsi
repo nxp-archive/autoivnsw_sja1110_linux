@@ -21,18 +21,30 @@
 		pinctrl-assert-gpios = <0xc 0x4 0x1>;
 
 		/* the switch */
-		sja1110@0 {
+		sja1110_sw: sja1110@0 {
 			compatible = "nxp,sja1110-switch";
 			spi-max-frequency = <8000000>;
 			reset-gpio = <195>;
+			gpio-controller;
+			#gpio-cells = <2>;
 			reg = <0x0>; /* CS */
 		};
 
 		/* the µC controlling the switch */
-		sja1110@1 {
+		sja1110_uc: sja1110@1 {
 			compatible = "nxp,sja1110-uc";
 			spi-max-frequency = <12000000>;
 			reg = <0x1>; /* CS */
+		};
+	};
+
+	/* Status LED attached to GPIO 10 of the SJA1110 */
+	gpio-leds@0 {
+		compatible = "gpio-leds";
+		sw0_alive {
+			gpios = <&sja1110_sw 10 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+			linux,default-trigger = "heartbeat";
 		};
 	};
 };
