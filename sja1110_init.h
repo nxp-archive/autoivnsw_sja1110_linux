@@ -110,7 +110,7 @@ enum uc_err_code {
 enum spi_devtype {SJA1110_SWITCH, SJA1110_UC};
 
 struct sja1110_switch_priv {
-	int rst_gpio;                /**< number of GPIO used to reset the device */
+	struct gpio_desc *rst_gpio;  /**< descriptor of GPIO used to reset the device */
 	struct gpio_chip gpio_chip;  /**< controller for SJA110's own GPIOs */
 };
 
