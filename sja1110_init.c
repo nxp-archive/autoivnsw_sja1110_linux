@@ -150,34 +150,28 @@ static u32 sja1110_write_bit(struct sja1110_priv *sja1110, u32 reg_addr,
 	return ret;
 }
 
-/* Retrieve GPIO number from the device tree and request it */
-static int get_and_request_gpio(struct sja1110_priv *sja1110)
+/**
+ * Retrieve the reset GPIO from the device tree and request it.
+ * Return its descriptor on success, NULL on failure.
+ */
+static struct gpio_desc *get_and_request_gpio(struct sja1110_priv *sja1110)
 {
-	struct device_node *node;
-	int rst_gpio = -1, ret = -ENODEV;
+	struct gpio_desc *gpio_desc, *ret = NULL;
 
-	node = sja1110->spi->dev.of_node;
-	if (!node)
-		goto out;
-
-	of_property_read_u32(node, "reset-gpio", &rst_gpio);
-	if (!gpio_is_valid(rst_gpio))
-		goto out;
-
-	if (gpio_request(rst_gpio, "SJA1110 soft reset") != 0) {
+	gpio_desc = devm_gpiod_get(&sja1110->spi->dev, "reset", 0);
+	if (IS_ERR(gpio_desc)) {
 		dev_err(&sja1110->spi->dev,
-			"GPIO request failed (already requested?)\n");
+			"Could not get GPIO from device tree\n");
 		goto out;
 	}
 
-	if (gpio_direction_output(rst_gpio, 1) != 0) {
+	if (gpiod_direction_output(gpio_desc, 0) != 0) {
 		dev_err(&sja1110->spi->dev,
 			"GPIO direction could not be set\n");
-		gpio_free(rst_gpio);
 		goto out;
 	}
 
-	ret = rst_gpio;
+	ret = gpio_desc;
 
 out:
 	return ret;
@@ -255,17 +249,17 @@ out:
  */
 static int sja1110_reset_gpio(struct sja1110_priv *sja1110)
 {
+	struct gpio_desc *rst_gpio;
 	int us = RESET_DELAY_US;
-	int rst_gpio;
 
 	BUG_ON(sja1110->devtype != SJA1110_SWITCH);
 	rst_gpio = sja1110->switch_priv->rst_gpio;
-	if (rst_gpio < 0)
-		return rst_gpio;
+	if (!rst_gpio)
+		return -ENODEV;
 
-	gpio_set_value_cansleep(rst_gpio, 0);
+	gpiod_set_value_cansleep(rst_gpio, 1);
 	usleep_range(us, us + DIV_ROUND_UP(us, 10));
-	gpio_set_value_cansleep(rst_gpio, 1);
+	gpiod_set_value_cansleep(rst_gpio, 0);
 
 	return 0;
 }
@@ -290,7 +284,7 @@ static int sja1110_reset(struct sja1110_priv *sja1110)
 	int ret, count = 0;
 
 	BUG_ON(sja1110->devtype != SJA1110_SWITCH);
-	if (sja1110->switch_priv->rst_gpio > 0)
+	if (sja1110->switch_priv->rst_gpio)
 		ret = sja1110_reset_gpio(sja1110);
 	else
 		ret = sja1110_reset_spi(sja1110);
@@ -1100,17 +1094,13 @@ static int sja1110_remove(struct spi_device *spi)
 	dev_info(&spi->dev, "[%s]\n", __func__);
 
 	sja1110 = spi_get_drvdata(spi);
-	if (sja1110->devtype == SJA1110_UC) {
+	if (sja1110->devtype == SJA1110_UC)
 		sysfs_remove_group(&spi->dev.kobj,
 				   &uc_attribute_group);
-	} else {
+	else
 		sysfs_remove_group(&spi->dev.kobj,
 				   &switch_attribute_group);
-
-		if (sja1110->switch_priv->rst_gpio > 0)
-			gpio_free(sja1110->switch_priv->rst_gpio);
-	}
-
+	
 	return 0;
 }
 

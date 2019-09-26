@@ -24,7 +24,7 @@
 		sja1110_sw: sja1110@0 {
 			compatible = "nxp,sja1110-switch";
 			spi-max-frequency = <8000000>;
-			reset-gpio = <195>;
+			reset-gpio = <&pca9557_a 3 GPIO_ACTIVE_LOW>;
 			gpio-controller;
 			#gpio-cells = <2>;
 			reg = <0x0>; /* CS */
