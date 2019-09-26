@@ -93,8 +93,8 @@ The switch node **must** have the follong properties:
 	> `spi-max-frequency = <12000000>;` (example)
 
 The uC node **may** have the following properties:
-- Reset GPIO Number
-	> `reset-gpio = <195>;` (example)
+- Reset GPIO Reference (Layout is: `<GPIO_CONTROLLER RELATIVE_PIN_NUMBER GPIO_FLAGS>`)
+	> `reset-gpio = <&pca9557_a 3 GPIO_ACTIVE_LOW>;` (example)
 - GPIO Controller Setup (in case GPIOs of **SJA1110** are used and should be configured via the device tree, see [GPIO Control chapter](#GPIO-Control))
 	> `gpio-controller;`
 
