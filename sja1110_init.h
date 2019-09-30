@@ -32,6 +32,13 @@
 #define _SJA1110_SPI_H__
 
 /*******************************************************************************
+ * Platform specific Macros
+ ******************************************************************************/
+#define SPI_BPW_UC 8
+#define SPI_BPW_SW 32
+
+
+/*******************************************************************************
  * Macros
  ******************************************************************************/
 #define DEF_FNAME_UC     "sja1110_uc.bin"
@@ -86,15 +93,34 @@ enum uc_err_code {
 #define CONFIGURATIONFLAG_ADDR (0x1UL)      /**< Address of the configurationFlags register */
 #define R_CTRL_ADDR            (0x1C6000UL) /**< Address of the resetCtrl register */
 #define RESET_CTRL_COLDRESET   BIT(5)
-#define CGU_OUTCLK_C_WATCHDOG  (0xFF719074UL)
+#define RESET_DELAY_US         50
+#define CGU_SPI_BASE_ADDR      (0x1C6400UL)
+#define CGU_OUTCLK_C_WATCHDOG  (CGU_SPI_BASE_ADDR + 0x1DUL)
 
 #define SJA1110_VAL_DEVICEID (0xb700030eUL)
+
+#define SJA1110_NUM_GPIOS  16
+
+#define GPIO_SPI_BASE_ADDR (0x1C4800UL)
+#define GPIO_PDO_ADDR      (GPIO_SPI_BASE_ADDR + 0x00UL)
+#define GPIO_PDOSET_ADDR   (GPIO_SPI_BASE_ADDR + 0x01UL)
+#define GPIO_PDOCLR_ADDR   (GPIO_SPI_BASE_ADDR + 0x02UL)
+#define GPIO_PDI_ADDR      (GPIO_SPI_BASE_ADDR + 0x40UL)
+#define GPIO_PCOE_ADDR     (GPIO_SPI_BASE_ADDR + 0x80UL)
+#define GPIO_PCOM_ADDR     (GPIO_SPI_BASE_ADDR + 0x81UL)
+#define GPIO_PCIE_ADDR     (GPIO_SPI_BASE_ADDR + 0xC0UL)
 
 
 /*******************************************************************************
  * Data Types
  ******************************************************************************/
 enum spi_devtype {SJA1110_SWITCH, SJA1110_UC};
+
+struct sja1110_switch_priv {
+	struct gpio_desc *rst_gpio;  /**< descriptor of GPIO used to reset the device */
+	struct gpio_chip gpio_chip;  /**< controller for SJA110's own GPIOs */
+};
+
 struct sja1110_priv {
 	struct spi_device *spi;      /**< Passsed at SPI probing */
 	char bin_name[PATH_LEN];     /**< Name of the binary (fw or config) */
@@ -105,6 +131,7 @@ struct sja1110_priv {
 	int (*upload)     (struct sja1110_priv*, const u8*, int);
 	int (*post_upload)(struct sja1110_priv*, const u8*, int);
 	struct work_struct work;
+	struct sja1110_switch_priv *switch_priv; /**< Additional data only required for the switch SPI endpoint */ 
 };
 
 struct sja1110_uc_status_pkt {
