@@ -1,6 +1,13 @@
 # Needs to define KERNELDIR, TARGET_ARCH, LOCAL_TOOLCHAIN, LOCAL_COMPILER
 -include local.cfg
 
+# Check setup
+ifeq ($(PWD), $(shell pwd))
+  ifeq ($(and $(KERNELDIR),$(TARGET_ARCH),$(LOCAL_TOOLCHAIN),$(LOCAL_COMPILER)),)
+  $(error One of the required variables {KERNELDIR, TARGET_ARCH, LOCAL_TOOLCHAIN, LOCAL_COMPILER} is not set!))
+  endif
+endif
+
 PWD := $(shell pwd)
 
 modules:
