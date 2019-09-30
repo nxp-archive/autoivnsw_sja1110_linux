@@ -74,15 +74,13 @@ A third method of using the GPIOs is to statically configure them in the device 
 
 `sja1110_sw` is a reference to the GPIO controller (i.e. the **switch** device tree node), `GPIO_NUMBER` is the (relative) number of the GPIO pin, and `FLAGS` are GPIO specific flags like for example `GPIO_ACTIVE_HIGH` or `GPIO_ACTIVE_LOW`.
 
-See `doc/example_device_tree.dtsi` for an example.
-
 ---
 ## SJA1110 Reset
 The **SJA1110** can be reset by either pulling the reset pin low, or by writing to the *ResetCtrl* register via SPI. In case a GPIO pin is configured in the [device tree](#DTS-Information), the former method will be preferred. Reset is done automatically during [auto upload](#Auto-Upload) but can also be manually triggered via the [sysfs userspace interface](#Userspace-Interface).
 
 ---
 ## DTS Information
-Since the **SJA1110** appears as two logical SPI devices, two distinct device tree entries are required. They are described in the sections below. For a full example of the device tree node refer to `doc/example_device_tree.dtsi`.
+Since the **SJA1110** appears as two logical SPI devices, two distinct device tree entries are required. They are described in the sections below. For a full example of the device tree node refer to `doc/SJA1110-EVM-Overlay.dts`.
 
 ### switch node
 The switch node **must** have the follong properties:

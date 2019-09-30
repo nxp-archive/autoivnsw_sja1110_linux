@@ -1,0 +1,171 @@
+/**
+ * Example device tree configuration of the SJA1110-EVM
+ */
+
+#include "platform_integration.h"
+#include <dt-bindings/gpio/gpio.h>
+
+/dts-v1/;
+/plugin/;
+/ {
+	model = "SJA1110-EVM Automotive Ethernet Switch Evaluation Board";
+	compatible = "nxp,sja1110-evm";
+
+	fragment@0 {
+		target = <&ETH_CON_SPI_CONTROLLER>;
+		__overlay__ {
+			/* the switch cores */
+			sja1110_sw: sja1110@0 {
+				compatible = "nxp,sja1110-switch";
+				spi-max-frequency = <5000000>;
+				reset-gpio = <&ETH_CON_RST_CONTROLLER GPIO_SW0_RST GPIO_ACTIVE_LOW>;
+				gpio-controller;
+				#gpio-cells = <2>;
+
+				reg = <CS0_ADDR>; /* CS */
+			};
+
+			// sja1110_sw1: sja1110sw@1 {
+			// 	compatible = "nxp,sja1110-switch";
+			// 	spi-max-frequency = <8000000>;
+			// 	reset-gpio = <&sja1110_sw 7 GPIO_ACTIVE_LOW>;
+			// 	reg = <0x1>; /* CS */
+			// };
+
+			/* the µC controlling the switch */
+			sja1110_uc: sja1110@1 {
+				compatible = "nxp,sja1110-uc";
+				spi-max-frequency = <5000000>;
+				reg = <CS1_ADDR>; /* CS */
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&ETH_CONTROLLER>;
+		__overlay__ {
+			mdio {
+				tja1101_phy: ethernet-phy@6	 {
+					compatible = "ethernet-phy-ieee802.3-c22";
+					reg = <0x6>;
+					max-speed = <0x64>;
+				};
+			};
+		};
+	};
+
+	fragment@2 {
+        target-path = "/";
+        __overlay__ {
+			gpio_i2c {
+				compatible = "i2c-gpio";
+				sda-gpios = <&sja1110_sw 1 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+				scl-gpios = <&sja1110_sw 0 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+				i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+				i2c-gpio,scl-output-only;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				/* I2C Port Extender */
+				sja1110_evm_gpio: gpio@20 {
+					compatible = "nxp,pca9505";
+					reg = <0x20>;
+					gpio-controller;
+					#gpio-cells = <2>;
+				};
+				/* I2C Switch towards SFP modules */
+				sja1110_evm_i2csw: i2c-switch@70 {
+					compatible = "nxp,pca9546";
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reg = <0x70>;
+
+					sfp0i2c: sfpi2c@0 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <0>;
+					};
+					sfp1i2c: sfpi2c@1 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <1>;
+					};
+					sfp2i2c: sfpi2c@2 {
+						#address-cells = <1>;
+						#size-cells = <0>;
+						reg = <2>;
+					};
+				};
+			};
+
+			/* SFP slots */
+			sfp_eth0: sfp-eth0 {
+				compatible = "sff,sfp";
+				i2c-bus = <&sfp0i2c>;
+				mod-def0-gpios = <&sja1110_evm_gpio 26 GPIO_ACTIVE_HIGH>;
+				pinctrl-names = "default";
+			};
+			sfp_eth1: sfp-eth1 {
+				compatible = "sff,sfp";
+				i2c-bus = <&sfp1i2c>;
+				mod-def0-gpios = <&sja1110_evm_gpio 27 GPIO_ACTIVE_HIGH>;
+				pinctrl-names = "default";
+			};
+			sfp_eth2: sfp-eth2 {
+				compatible = "sff,sfp";
+				i2c-bus = <&sfp2i2c>;
+				mod-def0-gpios = <&sja1110_evm_gpio 28 GPIO_ACTIVE_HIGH>;
+				pinctrl-names = "default";
+			};
+
+			/* PHYs in SFP slots */
+			sfp_phy0: ethernet-phy@0 {
+				compatible = "ethernet-phy-ieee802.3-c22";
+				pinctrl-names = "default";
+				reg = <0>;
+				sfp = <&sfp_eth0>;
+			};
+			sfp_phy1: ethernet-phy@1 {
+				compatible = "ethernet-phy-ieee802.3-c22";
+				pinctrl-names = "default";
+				reg = <0>;
+				sfp = <&sfp_eth1>;
+			};
+			sfp_phy2: ethernet-phy@2 {
+				compatible = "ethernet-phy-ieee802.3-c22";
+				pinctrl-names = "default";
+				reg = <0>;
+				sfp = <&sfp_eth2>;
+			};
+
+			/**
+			 * Since the symbol 'linux' is a built-in macro of GCC
+			 * we need to undefine it here. Otherwise it will be
+			 * replaced by the interger 1, which invalidates the
+			 * default-trigger property.
+			 */
+			#undef linux
+
+			gpio-leds@0 {
+				compatible = "gpio-leds";
+				sw0_alive {
+					gpios = <&sja1110_sw 10 GPIO_ACTIVE_HIGH>;
+					default-state = "off";
+					linux,default-trigger = "heartbeat";
+				};
+				sw0_red {
+					gpios = <&sja1110_sw 13 GPIO_ACTIVE_HIGH>;
+					default-state = "off";
+				};
+				sw0_green {
+					gpios = <&sja1110_sw 14 GPIO_ACTIVE_HIGH>;
+					default-state = "off";
+				};
+				sw0_blue {
+					gpios = <&sja1110_sw 15 GPIO_ACTIVE_HIGH>;
+					default-state = "off";
+				};
+			};
+		};
+	};
+};
