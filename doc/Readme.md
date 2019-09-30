@@ -31,3 +31,24 @@ This is the reason for the line
 #undef linux
 ```
 in the overlay file `SJA1110-EVM-Overlay.dts`.
+
+## Building the Device Tree Overlay
+This directory includes a Makefile that can be used to build the device tree overlay and merge it into a given base device tree binary.
+It requires the following tools to be installed on the system:
+- `dtc`: The Device Tree compiler
+	- Can be installed via package manager or can be built as part of a Kernel build (in linux/scripts/dtc/dtc)
+	- A reasonable recent version is required which supports symbol generation (otherwise a `invalid option -- '@'` error will be shown)
+- `dtmerge`: Tool which merges an overlay into a base device tree
+	- Can be built as part of [Raspberry Pi Userland Tools](https://github.com/raspberrypi/userland.git)
+	- Every other tool that uses the `fdt_overlay_apply()` function of [libfdt](https://git.kernel.org/pub/scm/utils/dtc/dtc.git/tree/libfdt) should work equally well
+
+Furthermore, a Kernel tree is required which contains device tree specific header files. The variable `KERNELDIR` must contain the path to the kernel tree.
+
+Lastly, the base device tree binary must be present in this directory, and its name must be stored in `DTB_BASE_NAME`.
+The filename `fsl-imx8qxp-mek-rpmsg` is an example for a i.MX 8QXPlus MEK CPU Board.
+
+If everything works as expected, executing `$ make` should produce the following files:
+- `SJA1110-EVM-Overlay_prep.dts`: Preprocessed overlay source (intermediate compilation result)
+- `fsl-imx8qxp-mek-rpmsg_merged.dtb` (example): Merged device tree binary
+
+The merged device tree binary can be deployed to the target and contains all the relevant information required to use the SJA1110-EVM Board.
