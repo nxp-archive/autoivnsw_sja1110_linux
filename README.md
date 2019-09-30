@@ -1,8 +1,15 @@
-# SJA1110 Linux Driver Release v0.4.0 - User Notes
+# SJA1110 Linux Driver Release v0.4.1 - User Notes
 
 ## Changelog
 v0.4.0: (Aug 2019)
 - Initial release
+
+v0.4.1: (Oct 2019)
+- Add Device Tree Overlay for SJA1110-EVM Board
+- Add GPIO driver to drive GPIO pins of SJA1110
+- Add max_spi_speed module parameter
+- Add hardware reset functionality via reset pin
+- Misc improvements and bug fixes
 
 ---
 

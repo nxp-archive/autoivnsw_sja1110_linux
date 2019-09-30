@@ -1140,7 +1140,7 @@ static void __exit sja1110_driver_exit(void)
 }
 module_exit(sja1110_driver_exit);
 
-MODULE_VERSION("0.4.0");
+MODULE_VERSION("0.4.1");
 MODULE_AUTHOR("Marco Hartmann <marco.hartmann@nxp.com>");
 MODULE_DESCRIPTION("SJA1110 SPI driver");
 MODULE_LICENSE("GPL");
