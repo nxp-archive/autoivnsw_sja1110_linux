@@ -1016,7 +1016,7 @@ static int sja1110_probe(struct spi_device *spi)
 		strncpy(sja1110->bin_name, firmware_name, PATH_LEN);
 		sja1110->bin_name[PATH_LEN - 1] = 0;
 
-		spi->bits_per_word    = 8;
+		spi->bits_per_word    = SPI_BPW_UC;
 		sja1110->def_bin_name = firmware_name;
 		sja1110->pre_upload   = sja1110_pre_uc_upload;
 		sja1110->upload       = sja1110_uc_upload;
@@ -1039,7 +1039,7 @@ static int sja1110_probe(struct spi_device *spi)
 		strncpy(sja1110->bin_name, config_name, PATH_LEN);
 		sja1110->bin_name[PATH_LEN - 1] = 0;
 
-		spi->bits_per_word    = 64;
+		spi->bits_per_word    = SPI_BPW_SW;
 		sja1110->def_bin_name = config_name;
 		sja1110->pre_upload   = sja1110_pre_switch_upload;
 		sja1110->upload       = sja1110_switch_upload;

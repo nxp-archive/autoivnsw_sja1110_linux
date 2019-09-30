@@ -13,7 +13,8 @@ v0.4.0: (Aug 2019)
 4. [GPIO Control](#GPIO-Control)
 5. [SJA1110 Reset](#SJA1110-Reset)
 6. [DTS Information](#DTS-Information)
-7. [Supported Linux versions](#Supported-Linux-versions)
+7. [Platform Specific Configuration](#Platform-Specific-Configuration)
+8. [Supported Linux versions](#Supported-Linux-versions)
 
 ---
 
@@ -109,6 +110,19 @@ The uC node **must** have the following properties:
 	> `reg = <0x1>;`(example)
 - Maximum SPI Frequency
 	> `spi-max-frequency = <12000000>;` (example)
+
+---
+## Platform Specific Configuration
+Platform specific configurations are largely outsourced to the device tree, such that the driver remains platform agnostic.
+One exception is the `bits_per_word` SPI configuration. It is not determined by the platform, but by the hardware which the driver targets.
+
+However, different platforms with different SPI drivers may only support a limited set of possible `bits_per_word` values. Hence they are configurable in the `sja1110_init.h` file and may require adjustment to the target platform in question.
+
+For the communication with the switch SPI endpoint, the following settings were tested to work:
+- i.MX6 with Linux 4.1.15: `SPI_BPW_SW = 64`
+- i.MX8 with Linux 4.19.35: `SPI_BPW_SW = 32`
+
+The configuration for the uC endpoint of `SPI_BPW_UC = 8` should work fine on almost any platform since it is a very common `bits_per_word` value.
 
 ---
 ## Supported Linux versions
